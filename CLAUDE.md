@@ -12,6 +12,7 @@ This file provides guidance for Claude when working in this repository.
   - `main.py`: entry point
   - `config.py`: configuration loading and validation
   - `language_detector.py`: language detection helpers
+  - `gitignore.py`: `.gitignore`-aware path matcher (built on `pathspec`) used to exclude ignored files/directories from all rule scans
   - `reporter.py`: output/report formatting
   - `rules/`: individual policy rule implementations (`file_existence.py`, `file_contents.py`, `file_type.py`, `directory_existence.py`)
 - `tests/`: pytest test suite aligned with modules under `src/`

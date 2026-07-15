@@ -42,6 +42,16 @@ This action is typically called via the `reusable-repolinter-check.yml` reusable
 | `config_url` | No | Qualcomm default config URL | URL to fetch the default policy config from if no local config is found |
 | `fail-on-error` | No | `true` | Exit non-zero when any `error`-level rule fails |
 | `fail-on-warning` | No | `false` | Exit non-zero when any `warning`-level rule fails |
+| `respect-gitignore` | No | `true` | Skip files and directories matched by the repository's `.gitignore` files when evaluating rules |
+
+### `.gitignore` handling
+
+By default the action honours the repository's `.gitignore` files (root and
+nested), so locally-present-but-ignored paths — build output, coverage
+reports, vendored dependencies — are excluded from every rule's scan. This
+prevents false failures from files that are not part of the tracked source.
+Set `respect-gitignore: false` (or pass `--no-respect-gitignore` when running
+locally) to scan the full working tree regardless of `.gitignore`.
 
 ### Config resolution order
 
