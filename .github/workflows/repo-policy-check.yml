@@ -14,7 +14,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run repository policy checks
         uses: qualcomm/repo-policy-action@d5daf4f9b44a503043e447c2e227b45fdeca2167
