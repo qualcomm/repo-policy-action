@@ -18,6 +18,7 @@ from typing import Any
 import magic
 
 from fs_utils import walk_files
+from gitignore import GitignoreMatcher
 from reporter import Reporter, RuleResult
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def run(
     level: str,
     options: dict[str, Any],
     reporter: Reporter,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> RuleResult:
     """Evaluate a no-file-type-exists rule.
 
@@ -71,6 +73,8 @@ def run(
             - ``"extensions"`` (list[str], optional): additional
               extensions to flag regardless of MIME type.
         reporter: Reporter instance.
+        ignore_matcher: When provided, files ignored by ``.gitignore``
+            are excluded from the scan.
 
     Returns:
         A RuleResult indicating pass or failure.
@@ -81,7 +85,7 @@ def run(
     root = Path(repo_path)
     mime_detector = magic.Magic(mime=True)
 
-    for file_path in walk_files(root):
+    for file_path in walk_files(root, ignore_matcher):
         if file_path.suffix.lower() in _ALLOWED_EXTENSIONS:
             continue
 

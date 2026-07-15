@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from src.gitignore import load_gitignore_matcher
 from src.reporter import Reporter
 from src.rules.file_type import run
 
@@ -145,6 +146,39 @@ class TestFileTypeRule(unittest.TestCase):
         )
         self.assertTrue(result.passed)
         self.assertIsNotNone(result.message)
+
+    def test_gitignored_binary_not_flagged(self):
+        """A binary matched by .gitignore is not flagged."""
+        repo = self._make_repo({".gitignore": "out/\n"})
+        binary_path = Path(repo) / "out" / "tool"
+        binary_path.parent.mkdir(parents=True)
+        _write_elf_header(binary_path)
+        matcher = load_gitignore_matcher(Path(repo), respect_gitignore=True)
+        result = run(
+            repo_path=repo,
+            rule_name="binaries-not-present",
+            level="warning",
+            options={},
+            reporter=self.reporter,
+            ignore_matcher=matcher,
+        )
+        self.assertTrue(result.passed)
+
+    def test_gitignored_binary_flagged_when_not_respected(self):
+        """Without a matcher, a gitignored binary is still flagged."""
+        repo = self._make_repo({".gitignore": "out/\n"})
+        binary_path = Path(repo) / "out" / "tool"
+        binary_path.parent.mkdir(parents=True)
+        _write_elf_header(binary_path)
+        result = run(
+            repo_path=repo,
+            rule_name="binaries-not-present",
+            level="warning",
+            options={},
+            reporter=self.reporter,
+            ignore_matcher=None,
+        )
+        self.assertFalse(result.passed)
 
 
 if __name__ == "__main__":

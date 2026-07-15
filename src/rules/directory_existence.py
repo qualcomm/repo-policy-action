@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from gitignore import GitignoreMatcher
 from reporter import Reporter, RuleResult
 from rules._common import globs_any_or_skip
 
@@ -25,6 +26,7 @@ def run(
     level: str,
     options: dict[str, Any],
     reporter: Reporter,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> RuleResult:
     """Evaluate a directory-existence rule.
 
@@ -36,6 +38,8 @@ def run(
             - ``"globsAny"`` (list[str]): glob patterns, at least one
               must match a directory.
         reporter: Reporter instance.
+        ignore_matcher: When provided, directories ignored by
+            ``.gitignore`` do not count as satisfying the rule.
 
     Returns:
         A RuleResult indicating pass or failure.
@@ -49,6 +53,12 @@ def run(
     root = Path(repo_path)
     for pattern in globs:
         matches = [p for p in root.glob(pattern) if p.is_dir()]
+        if ignore_matcher is not None:
+            matches = [
+                p
+                for p in matches
+                if not ignore_matcher.is_ignored(p, is_dir=True)
+            ]
         if matches:
             logger.debug(
                 "Rule '%s' passed — found directory '%s'.",

@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.gitignore import load_gitignore_matcher
 from src.language_detector import detect_languages
 
 
@@ -92,6 +93,21 @@ class TestDetectLanguages(unittest.TestCase):
         result = detect_languages(repo)
         self.assertEqual(result["languages"], set())
         self.assertEqual(result["packagers"], set())
+
+    def test_gitignored_files_excluded(self):
+        """Files matched by .gitignore are excluded from detection."""
+        repo = self._make_repo(["src/main.py", "src/util.py"])
+        (Path(repo) / ".gitignore").write_text("src/\n")
+        matcher = load_gitignore_matcher(Path(repo), respect_gitignore=True)
+        result = detect_languages(repo, matcher)
+        self.assertNotIn("Python", result["languages"])
+
+    def test_gitignored_files_included_without_matcher(self):
+        """Without a matcher, gitignored files still count (opt-out)."""
+        repo = self._make_repo(["src/main.py", "src/util.py"])
+        (Path(repo) / ".gitignore").write_text("src/\n")
+        result = detect_languages(repo, None)
+        self.assertIn("Python", result["languages"])
 
 
 if __name__ == "__main__":

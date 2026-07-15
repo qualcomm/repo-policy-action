@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from gitignore import GitignoreMatcher
 from reporter import Reporter, RuleResult
 from rules._common import globs_any_or_skip
 
@@ -29,6 +30,7 @@ def run(
     level: str,
     options: dict[str, Any],
     reporter: Reporter,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> RuleResult:
     """Evaluate a file-existence rule.
 
@@ -46,6 +48,8 @@ def run(
             - ``"fail-message"`` (str, optional): custom message to
               emit on failure instead of the default.
         reporter: Reporter instance.
+        ignore_matcher: When provided, files ignored by ``.gitignore``
+            do not count as satisfying the rule.
 
     Returns:
         A RuleResult indicating pass or failure.
@@ -105,9 +109,32 @@ def _find_first_match(
                     for p in base.glob(pattern)
                     if _is_accessible_file(p) and _case_matches(p, pattern)
                 ]
+            matches = _filter_ignored(matches, ignore_matcher)
             if matches:
                 return matches[0]
     return None
+
+
+def _filter_ignored(
+    matches: list[Path],
+    ignore_matcher: GitignoreMatcher | None,
+) -> list[Path]:
+    """Drop paths ignored by ``.gitignore`` from a match list.
+
+    Args:
+        matches: Candidate paths from a glob.
+        ignore_matcher: When None, ``matches`` is returned unchanged.
+
+    Returns:
+        The filtered list of paths.
+    """
+    if ignore_matcher is None:
+        return matches
+    return [
+        p
+        for p in matches
+        if not ignore_matcher.is_ignored(p, is_dir=p.is_dir())
+    ]
 
 
 def _expand_braces(pattern: str) -> list[str]:

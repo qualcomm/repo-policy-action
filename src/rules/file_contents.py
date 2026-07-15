@@ -19,6 +19,7 @@ from typing import Any
 import magic
 
 from fs_utils import SKIP_DIRS
+from gitignore import GitignoreMatcher
 from reporter import Reporter, RuleResult
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ def run(
     level: str,
     options: dict[str, Any],
     reporter: Reporter,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> RuleResult:
     """Evaluate a file-contents or file-starts-with rule.
 
@@ -115,6 +117,8 @@ def run(
         options: Rule options from the config. See ``_parse_options``
             for the full list of supported keys.
         reporter: Reporter instance.
+        ignore_matcher: When provided, files ignored by ``.gitignore``
+            are excluded from the scan.
 
     Returns:
         A RuleResult indicating pass or failure.
@@ -136,7 +140,7 @@ def run(
         return reporter.rule_failed(**compiled_patterns)
 
     root = Path(repo_path)
-    matched_files = _find_files(root, opts.globs)
+    matched_files = _find_files(root, opts.globs, ignore_matcher)
 
     if not matched_files:
         if opts.fail_on_missing:
@@ -380,12 +384,18 @@ def _is_binary(path: Path, mime_detector: magic.Magic) -> bool:
         return False
 
 
-def _find_files(root: Path, globs: list[str]) -> list[Path]:
+def _find_files(
+    root: Path,
+    globs: list[str],
+    ignore_matcher: GitignoreMatcher | None = None,
+) -> list[Path]:
     """Return all files under root that match any of the glob patterns.
 
     Args:
         root: Repository root path.
         globs: List of glob patterns to match.
+        ignore_matcher: When provided, files ignored by ``.gitignore``
+            are excluded from the results.
 
     Returns:
         Sorted, deduplicated list of matching file paths.
@@ -393,13 +403,19 @@ def _find_files(root: Path, globs: list[str]) -> list[Path]:
     found: set[Path] = set()
     for pattern in globs:
         for match in root.glob(pattern):
-            if match.is_file() and not _in_skip_dir(match, root):
+            if _in_skip_dir(match, root):
+                continue
+            if ignore_matcher is not None and ignore_matcher.is_ignored(
+                match, is_dir=match.is_dir()
+            ):
+                continue
+            if match.is_file():
                 if match.stat().st_size == 0:
                     logger.debug("Skipping empty file %s.", match)
                     continue
                 found.add(match)
             # Include broken symlinks so we can handle them explicitly.
-            elif match.is_symlink() and not _in_skip_dir(match, root):
+            elif match.is_symlink():
                 found.add(match)
     return sorted(found)
 

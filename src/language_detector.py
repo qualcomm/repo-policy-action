@@ -22,6 +22,7 @@ import logging
 from pathlib import Path
 
 from fs_utils import walk_files
+from gitignore import GitignoreMatcher
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,15 @@ _PACKAGER_FILES: dict[str, str] = {
 _MIN_FILE_THRESHOLD = 2
 
 
-def detect_languages(repo_path: str) -> dict[str, set[str]]:
+def detect_languages(
+    repo_path: str, ignore_matcher: GitignoreMatcher | None = None
+) -> dict[str, set[str]]:
     """Return the languages and packagers detected in the repository.
 
     Args:
         repo_path: Absolute path to the repository root.
+        ignore_matcher: When provided, files and directories ignored by
+            ``.gitignore`` are excluded from detection.
 
     Returns:
         A dict with two keys:
@@ -96,7 +101,7 @@ def detect_languages(repo_path: str) -> dict[str, set[str]]:
     extension_counts: dict[str, int] = {}
     detected_packagers: set[str] = set()
 
-    for item in walk_files(root):
+    for item in walk_files(root, ignore_matcher):
         if item.is_file():
             ext = item.suffix.lower()
             if ext in _EXT_TO_LANGUAGE:

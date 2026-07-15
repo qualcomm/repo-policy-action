@@ -45,6 +45,14 @@ line_length = 80
 [tool.pylint.format]
 max-line-length = 80
 
+[tool.pylint.design]
+# Rule handlers share a fixed dispatch signature (repo_path, rule_name,
+# level, options, reporter, ignore_matcher) — six parameters, always
+# passed by keyword from the dispatcher. Allow it rather than scattering
+# per-function disables across every handler module.
+max-args = 6
+max-positional-arguments = 6
+
 [tool.pylint.messages_control]
 # too-few-public-methods: dataclasses and simple result classes trigger this
 disable = ["too-few-public-methods"]

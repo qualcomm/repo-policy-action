@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.gitignore import load_gitignore_matcher
 from src.reporter import Reporter
 from src.rules.directory_existence import run
 
@@ -69,6 +70,35 @@ class TestDirectoryExistenceRule(unittest.TestCase):
             level="warning",
             options={},
             reporter=self.reporter,
+        )
+        self.assertTrue(result.passed)
+
+    def test_gitignored_directory_does_not_satisfy_rule(self):
+        """A directory matched by .gitignore does not count as existing."""
+        repo = self._make_repo(["tests"])
+        (Path(repo) / ".gitignore").write_text("tests/\n")
+        matcher = load_gitignore_matcher(Path(repo), respect_gitignore=True)
+        result = run(
+            repo_path=repo,
+            rule_name="test-directory-exists",
+            level="warning",
+            options={"globsAny": ["**/test*", "**/spec*"]},
+            reporter=self.reporter,
+            ignore_matcher=matcher,
+        )
+        self.assertFalse(result.passed)
+
+    def test_gitignored_directory_satisfies_when_not_respected(self):
+        """Without a matcher, a gitignored directory still satisfies."""
+        repo = self._make_repo(["tests"])
+        (Path(repo) / ".gitignore").write_text("tests/\n")
+        result = run(
+            repo_path=repo,
+            rule_name="test-directory-exists",
+            level="warning",
+            options={"globsAny": ["**/test*", "**/spec*"]},
+            reporter=self.reporter,
+            ignore_matcher=None,
         )
         self.assertTrue(result.passed)
 

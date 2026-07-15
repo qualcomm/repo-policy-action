@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
 import click
 
 from config import load_config
+from gitignore import load_gitignore_matcher
 from language_detector import detect_languages
 from reporter import Reporter
 from rules import run_all_rules
@@ -60,12 +62,22 @@ _DEFAULT_CONFIG_URL = (
     show_default=True,
     help="Exit non-zero when any warning-level rule fails.",
 )
+@click.option(
+    "--respect-gitignore/--no-respect-gitignore",
+    default=True,
+    show_default=True,
+    help=(
+        "Skip files and directories matched by the repository's "
+        ".gitignore files when evaluating rules."
+    ),
+)
 def main(
     repo_path: str,
     config_file: str | None,
     config_url: str,
     fail_on_error: bool,
     fail_on_warning: bool,
+    respect_gitignore: bool,
 ) -> None:
     """Enforce repository policy standards for Qualcomm open-source projects."""
     logging.basicConfig(
@@ -86,12 +98,16 @@ def main(
         reporter.error("Failed to load policy config. Cannot continue.")
         sys.exit(1)
 
-    languages = detect_languages(repo_path)
+    ignore_matcher = load_gitignore_matcher(
+        Path(repo_path), respect_gitignore=respect_gitignore
+    )
+    languages = detect_languages(repo_path, ignore_matcher)
     results = run_all_rules(
         repo_path=repo_path,
         config=config,
         languages=languages,
         reporter=reporter,
+        ignore_matcher=ignore_matcher,
     )
 
     errors = [r for r in results if r.level == "error" and not r.passed]

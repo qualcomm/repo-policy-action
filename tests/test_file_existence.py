@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.gitignore import load_gitignore_matcher
 from src.reporter import Reporter
 from src.rules.file_existence import run
 
@@ -199,6 +200,35 @@ class TestFileExistenceRule(unittest.TestCase):
                 "nocase": True,
             },
             reporter=self.reporter,
+        )
+        self.assertTrue(result.passed)
+
+    def test_gitignored_file_does_not_satisfy_rule(self):
+        """A file matched by .gitignore does not count as existing."""
+        repo = self._make_repo(["LICENSE"])
+        (Path(repo) / ".gitignore").write_text("LICENSE\n")
+        matcher = load_gitignore_matcher(Path(repo), respect_gitignore=True)
+        result = run(
+            repo_path=repo,
+            rule_name="license-file-exists",
+            level="error",
+            options={"globsAny": ["LICENSE", "COPYING", "NOTICE"]},
+            reporter=self.reporter,
+            ignore_matcher=matcher,
+        )
+        self.assertFalse(result.passed)
+
+    def test_gitignored_file_satisfies_rule_when_not_respected(self):
+        """Without a matcher, a gitignored file still satisfies the rule."""
+        repo = self._make_repo(["LICENSE"])
+        (Path(repo) / ".gitignore").write_text("LICENSE\n")
+        result = run(
+            repo_path=repo,
+            rule_name="license-file-exists",
+            level="error",
+            options={"globsAny": ["LICENSE", "COPYING", "NOTICE"]},
+            reporter=self.reporter,
+            ignore_matcher=None,
         )
         self.assertTrue(result.passed)
 

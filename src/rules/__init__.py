@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from gitignore import GitignoreMatcher
 from reporter import Reporter, RuleResult
 from rules.directory_existence import run as run_directory_existence
 from rules.file_contents import run as run_file_contents
@@ -36,6 +37,7 @@ def run_all_rules(
     config: dict[str, Any],
     languages: dict[str, set[str]],
     reporter: Reporter,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> list[RuleResult]:
     """Run all applicable rules from the config.
 
@@ -45,6 +47,8 @@ def run_all_rules(
         languages: Output of ``detect_languages`` — detected language
             and packager sets.
         reporter: Reporter instance for emitting annotations.
+        ignore_matcher: When provided, files and directories ignored by
+            ``.gitignore`` are excluded from every rule's scan.
 
     Returns:
         List of RuleResult objects, one per evaluated rule.
@@ -83,6 +87,7 @@ def run_all_rules(
             level=level,
             options=rule_spec.get("options", {}),
             reporter=reporter,
+            ignore_matcher=ignore_matcher,
         )
         results.append(result)
 

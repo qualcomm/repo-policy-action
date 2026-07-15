@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from src.gitignore import load_gitignore_matcher
 from src.reporter import Reporter
 from src.rules.file_contents import run
 
@@ -430,6 +431,53 @@ class TestFileContentsRule(unittest.TestCase):
             reporter=self.reporter,
         )
         self.assertTrue(result.passed)
+
+    def test_gitignored_file_excluded_from_content_check(self):
+        """A gitignored file is not scanned, so its content can't fail."""
+        repo = self._make_repo(
+            {
+                "README.md": "MIT license",
+                "generated/report.md": "just some notes",
+                ".gitignore": "generated/\n",
+            }
+        )
+        matcher = load_gitignore_matcher(Path(repo), respect_gitignore=True)
+        result = run(
+            repo_path=repo,
+            rule_name="all-md-reference-license",
+            level="error",
+            options={
+                "globsAll": ["**/*.md"],
+                "content": "license",
+                "flags": ["IGNORECASE"],
+            },
+            reporter=self.reporter,
+            ignore_matcher=matcher,
+        )
+        self.assertTrue(result.passed)
+
+    def test_gitignored_file_scanned_when_not_respected(self):
+        """Without a matcher, the gitignored file is scanned and fails."""
+        repo = self._make_repo(
+            {
+                "README.md": "MIT license",
+                "generated/report.md": "just some notes",
+                ".gitignore": "generated/\n",
+            }
+        )
+        result = run(
+            repo_path=repo,
+            rule_name="all-md-reference-license",
+            level="error",
+            options={
+                "globsAll": ["**/*.md"],
+                "content": "license",
+                "flags": ["IGNORECASE"],
+            },
+            reporter=self.reporter,
+            ignore_matcher=None,
+        )
+        self.assertFalse(result.passed)
 
 
 if __name__ == "__main__":
