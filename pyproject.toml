@@ -11,6 +11,8 @@ dependencies = [
     # python-magic: magic-byte detection for the binary prohibition rule.
     #   Requires libmagic on the runner (pre-installed on ubuntu-latest).
     "python-magic==0.4.27",
+    # pathspec: .gitignore pattern matching (same engine used by black/pip).
+    "pathspec==1.1.1",
 ]
 
 [dependency-groups]

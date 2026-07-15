@@ -38,7 +38,9 @@ packaging==26.2
     #   black
     #   pytest
 pathspec==1.1.1
-    # via black
+    # via
+    #   black
+    #   repo-policy-action
 platformdirs==4.10.0
     # via
     #   black

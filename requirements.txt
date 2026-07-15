@@ -10,6 +10,8 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via click
 idna==3.18
     # via requests
+pathspec==1.1.1
+    # via repo-policy-action
 python-magic==0.4.27
     # via repo-policy-action
 requests==2.32.3
