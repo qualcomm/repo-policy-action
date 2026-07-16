@@ -14,6 +14,7 @@ import fnmatch
 import logging
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,26 @@ from reporter import Reporter, RuleResult
 from rules._common import globs_any_or_skip
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _Options:
+    """Normalised file-existence rule options."""
+
+    globs: list[str]
+    dirs: list[str]
+    nocase: bool
+    fail_message: str | None
+
+
+def _parse_options(options: dict[str, Any]) -> _Options:
+    """Normalise rule options into canonical types."""
+    return _Options(
+        globs=options.get("globsAny", []),
+        dirs=options.get("dirs", [""]),
+        nocase=options.get("nocase", False),
+        fail_message=options.get("fail-message"),
+    )
 
 
 def run(
@@ -54,27 +75,28 @@ def run(
     Returns:
         A RuleResult indicating pass or failure.
     """
-    globs: list[str] = options.get("globsAny", [])
-    dirs: list[str] = options.get("dirs", [""])
-    nocase: bool = options.get("nocase", False)
-    fail_message: str | None = options.get("fail-message")
+    opts = _parse_options(options)
 
-    skip_result = globs_any_or_skip(globs, rule_name, reporter)
+    skip_result = globs_any_or_skip(opts.globs, rule_name, reporter)
     if skip_result is not None:
         return skip_result
 
     root = Path(repo_path)
     # Expand brace expressions once before iterating dirs.
-    expanded_globs = [e for g in globs for e in _expand_braces(g)]
-    match = _find_first_match(root, dirs, expanded_globs, nocase)
+    expanded_globs = [e for g in opts.globs for e in _expand_braces(g)]
+    match = _find_first_match(
+        root, opts.dirs, expanded_globs, opts.nocase, ignore_matcher
+    )
     if match is not None:
         logger.debug("Rule '%s' passed — found '%s'.", rule_name, match)
         return reporter.rule_passed(
             rule_name, f"Found: {match.relative_to(root)}"
         )
 
-    searched = ", ".join((str(root / d) if d else str(root)) for d in dirs)
-    message = fail_message or (f"No file matching {globs} found in: {searched}")
+    searched = ", ".join((str(root / d) if d else str(root)) for d in opts.dirs)
+    message = opts.fail_message or (
+        f"No file matching {opts.globs} found in: {searched}"
+    )
     return reporter.rule_failed(
         rule_name=rule_name,
         level=level,
@@ -83,7 +105,11 @@ def run(
 
 
 def _find_first_match(
-    root: Path, dirs: list[str], expanded_globs: list[str], nocase: bool
+    root: Path,
+    dirs: list[str],
+    expanded_globs: list[str],
+    nocase: bool,
+    ignore_matcher: GitignoreMatcher | None = None,
 ) -> Path | None:
     """Return the first file matching any glob in any dir, or None.
 
@@ -92,6 +118,8 @@ def _find_first_match(
         dirs: Subdirectories (relative to root) to search; "" for root.
         expanded_globs: Brace-expanded glob patterns to try.
         nocase: Whether to match filenames case-insensitively.
+        ignore_matcher: When provided, files ignored by ``.gitignore``
+            do not count as a match.
 
     Returns:
         The first matching Path, or None if nothing matched.

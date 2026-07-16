@@ -23,10 +23,12 @@ import pathspec
 
 logger = logging.getLogger(__name__)
 
-# Directory names never walked when collecting .gitignore files. Reading a
+# Directory names never walked when collecting .gitignore files or
+# repository content — shared with fs_utils.walk_files() so the two
+# walks stay in sync rather than drifting as separate copies. Reading a
 # .gitignore from inside e.g. a vendored dependency or the .git dir would
 # apply rules the repository owner never wrote.
-_SKIP_SCAN_DIRS = frozenset(
+SKIP_DIRS = frozenset(
     {
         ".git",
         "node_modules",
@@ -186,7 +188,7 @@ def _walk_for_gitignore(directory: Path, found: list[Path]) -> None:
 
     for entry in entries:
         if entry.is_dir():
-            if entry.name not in _SKIP_SCAN_DIRS and not entry.is_symlink():
+            if entry.name not in SKIP_DIRS and not entry.is_symlink():
                 _walk_for_gitignore(entry, found)
         elif entry.name == _GITIGNORE_NAME and entry.is_file():
             found.append(entry)

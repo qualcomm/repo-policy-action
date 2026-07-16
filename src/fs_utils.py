@@ -12,23 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gitignore import GitignoreMatcher
-
-# Directories to skip when walking the repository tree.
-SKIP_DIRS = frozenset(
-    {
-        ".git",
-        "node_modules",
-        "vendor",
-        ".tox",
-        ".venv",
-        "ENV",
-        "venv",
-        "__pycache__",
-        "dist",
-        "build",
-    }
-)
+from gitignore import SKIP_DIRS, GitignoreMatcher
 
 
 def walk_files(root: Path, ignore_matcher: GitignoreMatcher | None = None):
