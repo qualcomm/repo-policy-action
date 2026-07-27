@@ -6,11 +6,17 @@
 
 Usage:
     python3 scripts/compare_tools.py [--workers N] [--output results.json]
+    python3 scripts/compare_tools.py --orgs qualcomm
+    python3 scripts/compare_tools.py --orgs qualcomm qualcomm-linux --repos repo-a repo-b repo-c
 
 Enumerates public, non-fork repos across quic, qualcomm, qualcomm-linux,
 qualcomm-qrb-ros, audioreach (excluding linux-kernel and
 linux-kernel-topics), clones each into a temp dir, runs both tools, and
 reports discrepancies.
+
+Use --orgs to restrict scanning to a subset of the orgs above, and --repos
+to further restrict to specific repos within the selected orgs (matched by
+bare name, e.g. "repo-a", or by "org/repo", e.g. "qualcomm/repo-a").
 
 Highlights any case where RPA emits an ERROR that repolinter does not.
 
@@ -240,18 +246,54 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--output", default="/tmp/rpa_comparison_results.json")
+    parser.add_argument("--orgs", nargs="+", metavar="ORG")
+    parser.add_argument("--repos", nargs="+", metavar="REPO")
     args = parser.parse_args()
+
+    if args.orgs:
+        invalid_orgs = [org for org in args.orgs if org not in ORGS]
+        if invalid_orgs:
+            print(
+                f"ERROR: unknown org(s): {', '.join(invalid_orgs)}",
+                file=sys.stderr,
+            )
+            print(f"Valid orgs: {', '.join(ORGS)}", file=sys.stderr)
+            sys.exit(1)
+    selected_orgs = args.orgs or ORGS
 
     print("Fetching repo lists...", flush=True)
     repos: list[tuple[str, str]] = []
-    for org in ORGS:
+    matched_repo_filters: set[str] = set()
+    for org in selected_orgs:
         try:
             org_repos = get_repos(org)
-            print(f"  {org}: {len(org_repos)} repos")
+            if args.repos:
+                filtered = []
+                for r in org_repos:
+                    hits = {
+                        f for f in args.repos
+                        if f == r["name"] or f == f"{org}/{r['name']}"
+                    }
+                    if hits:
+                        matched_repo_filters |= hits
+                        filtered.append(r)
+                print(f"  {org}: {len(filtered)}/{len(org_repos)} repos")
+                org_repos = filtered
+            else:
+                print(f"  {org}: {len(org_repos)} repos")
             for r in org_repos:
                 repos.append((org, r["name"]))
         except subprocess.CalledProcessError as e:
             print(f"  {org}: failed to list repos: {e}", file=sys.stderr)
+
+    if args.repos:
+        unmatched = set(args.repos) - matched_repo_filters
+        if unmatched:
+            print(
+                f"ERROR: --repos filter(s) matched no repo: {', '.join(sorted(unmatched))}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     print(f"\nScanning {len(repos)} repos with {args.workers} workers...")
 
