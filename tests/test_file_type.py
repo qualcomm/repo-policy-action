@@ -180,6 +180,71 @@ class TestFileTypeRule(unittest.TestCase):
         )
         self.assertFalse(result.passed)
 
+    def test_reports_all_offending_binaries(self):
+        """Rule reports all binary files that are found."""
+        repo = self._make_repo({})
+        _write_elf_header(Path(repo) / "tool1")
+        _write_pe_header(Path(repo) / "tool2.exe")
+        result = run(
+            repo_path=repo,
+            rule_name="binaries-not-present",
+            level="warning",
+            options={},
+            reporter=self.reporter,
+        )
+        self.assertFalse(result.passed)
+        # result should be a RuleResultList containing 2 failures
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(result.__class__.__name__, "RuleResultList")
+        assert isinstance(result, list)
+        self.assertEqual(len(result), 2)
+        paths = {r.file_path for r in result}
+        self.assertIn("tool1", paths)
+        self.assertIn("tool2.exe", paths)
+
+    def test_extra_extension_flagged(self):
+        """Files matching the extra 'extensions' option are flagged."""
+        repo = self._make_repo(
+            {
+                "src/main.py": "print('hello')",
+                "lib/native.so": "not really a shared lib",
+            }
+        )
+        result = run(
+            repo_path=repo,
+            rule_name="no-shared-libs",
+            level="error",
+            options={"extensions": [".so"]},
+            reporter=self.reporter,
+        )
+        self.assertFalse(result.passed)
+        self.assertIn("native.so", result.file_path or "")
+
+    def test_multiple_extra_extensions_all_flagged(self):
+        """All files matching extra extensions are reported."""
+        repo = self._make_repo(
+            {
+                "src/main.py": "print('hello')",
+                "lib/native.so": "not really a shared lib",
+                "lib/other.so": "also not a shared lib",
+            }
+        )
+        result = run(
+            repo_path=repo,
+            rule_name="no-shared-libs",
+            level="error",
+            options={"extensions": [".so"]},
+            reporter=self.reporter,
+        )
+        self.assertFalse(result.passed)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(result.__class__.__name__, "RuleResultList")
+        assert isinstance(result, list)
+        self.assertEqual(len(result), 2)
+        paths = {r.file_path for r in result}
+        self.assertIn("lib/native.so", paths)
+        self.assertIn("lib/other.so", paths)
+
 
 if __name__ == "__main__":
     unittest.main()

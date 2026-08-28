@@ -20,7 +20,7 @@ import magic
 
 from fs_utils import SKIP_DIRS
 from gitignore import GitignoreMatcher
-from reporter import Reporter, RuleResult
+from reporter import Reporter, RuleResult, RuleResultList
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def run(
     options: dict[str, Any],
     reporter: Reporter,
     ignore_matcher: GitignoreMatcher | None = None,
-) -> RuleResult:
+) -> RuleResult | RuleResultList:
     """Evaluate a file-contents or file-starts-with rule.
 
     Scans every file matched by ``globsAll`` and checks whether each
@@ -154,11 +154,14 @@ def run(
             rule_name, f"No files matched {opts.globs} — skipped."
         )
 
-    failure = _scan_files(
+    failures = _scan_files(
         matched_files, root, compiled_patterns, opts, rule_name
     )
-    if failure is not None:
-        return reporter.rule_failed(level=level, **failure)
+    if failures:
+        results = [
+            reporter.rule_failed(level=level, **failure) for failure in failures
+        ]
+        return RuleResultList(results)
 
     return reporter.rule_passed(
         rule_name,
@@ -172,12 +175,13 @@ def _scan_files(
     compiled_patterns: list[tuple[str, re.Pattern]],
     opts: _Options,
     rule_name: str,
-) -> dict[str, Any] | None:
+) -> list[dict[str, Any]]:
     """Scan matched files against the compiled patterns.
 
-    Returns kwargs (minus ``level``) for ``reporter.rule_failed`` on the
-    first offending file, or ``None`` if every file passed.
+    Returns a list of kwargs (minus ``level``) for ``reporter.rule_failed`` for
+    all offending files, or an empty list if every file passed.
     """
+    failures: list[dict[str, Any]] = []
     skip_patterns = _compile_skip_patterns(opts.skip_paths, rule_name)
     mime_detector = magic.Magic(mime=True) if opts.skip_binary else None
 
@@ -202,8 +206,8 @@ def _scan_files(
             opts.fail_message,
         )
         if failure is not None:
-            return failure
-    return None
+            failures.append(failure)
+    return failures
 
 
 def _compile_all_patterns(

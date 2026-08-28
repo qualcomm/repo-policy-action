@@ -377,5 +377,62 @@ class TestFileTypeExclusionAlias(unittest.TestCase):
         self.assertTrue(results[0].passed)
 
 
+_MULTI_FILE_CONTENT_CONFIG = {
+    "version": 2,
+    "rules": {
+        "copyright-header-check": {
+            "level": "error",
+            "rule": {
+                "type": "file-contents",
+                "options": {
+                    "globsAll": ["*.py"],
+                    "content": "Copyright",
+                },
+            },
+        },
+    },
+}
+
+
+class TestMultipleFailuresFlattened(unittest.TestCase):
+    """Verify that RuleResultList failures are flattened into run_all_rules results."""
+
+    def setUp(self):
+        self.reporter = Reporter()
+
+    def _make_repo(self, files: dict[str, str]) -> str:
+        tmp = tempfile.mkdtemp()
+        for rel_path, content in files.items():
+            path = Path(tmp) / rel_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        return tmp
+
+    def test_multiple_failures_flattened_into_results(self):
+        """When a rule returns multiple failures (RuleResultList), they are
+        all flattened into the results list returned by run_all_rules."""
+        repo = self._make_repo(
+            {
+                "file1.py": "print('hello')",
+                "file2.py": "print('world')",
+                "file3.py": "# Copyright Qualcomm\nprint('ok')",
+            }
+        )
+        languages = detect_languages(repo)
+        results = run_all_rules(
+            repo_path=repo,
+            config=_MULTI_FILE_CONTENT_CONFIG,
+            languages=languages,
+            reporter=self.reporter,
+        )
+        # Two files are missing the copyright header → 2 failures in results
+        failed = [r for r in results if not r.passed]
+        self.assertEqual(len(failed), 2)
+        paths = {r.file_path for r in failed}
+        self.assertIn("file1.py", paths)
+        self.assertIn("file2.py", paths)
+        self.assertNotIn("file3.py", paths)
+
+
 if __name__ == "__main__":
     unittest.main()

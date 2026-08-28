@@ -19,7 +19,7 @@ import magic
 
 from fs_utils import walk_files
 from gitignore import GitignoreMatcher
-from reporter import Reporter, RuleResult
+from reporter import Reporter, RuleResult, RuleResultList
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +57,11 @@ def run(
     options: dict[str, Any],
     reporter: Reporter,
     ignore_matcher: GitignoreMatcher | None = None,
-) -> RuleResult:
+) -> RuleResult | RuleResultList:
     """Evaluate a no-file-type-exists rule.
 
     Scans the repository for binary files identified by magic bytes.
-    Reports the first offending file found.
+    Reports all offending files found.
 
     Args:
         repo_path: Absolute path to the repository root.
@@ -84,22 +84,26 @@ def run(
     }
     root = Path(repo_path)
     mime_detector = magic.Magic(mime=True)
+    failures: list[RuleResult] = []
 
     for file_path in walk_files(root, ignore_matcher):
         if file_path.suffix.lower() in _ALLOWED_EXTENSIONS:
             continue
 
         if file_path.suffix.lower() in extra_extensions:
-            return reporter.rule_failed(
-                rule_name=rule_name,
-                level=level,
-                message=(
-                    f"Binary file found (matched extension "
-                    f"{file_path.suffix!r}): "
-                    f"{file_path.relative_to(root)}"
-                ),
-                file_path=str(file_path.relative_to(root)),
+            failures.append(
+                reporter.rule_failed(
+                    rule_name=rule_name,
+                    level=level,
+                    message=(
+                        f"Binary file found (matched extension "
+                        f"{file_path.suffix!r}): "
+                        f"{file_path.relative_to(root)}"
+                    ),
+                    file_path=str(file_path.relative_to(root)),
+                )
             )
+            continue
 
         try:
             mime = mime_detector.from_file(str(file_path))
@@ -110,14 +114,19 @@ def run(
             continue
 
         if any(mime.startswith(prefix) for prefix in _BINARY_MIME_PREFIXES):
-            return reporter.rule_failed(
-                rule_name=rule_name,
-                level=level,
-                message=(
-                    f"Binary file found (MIME: {mime}): "
-                    f"{file_path.relative_to(root)}"
-                ),
-                file_path=str(file_path.relative_to(root)),
+            failures.append(
+                reporter.rule_failed(
+                    rule_name=rule_name,
+                    level=level,
+                    message=(
+                        f"Binary file found (MIME: {mime}): "
+                        f"{file_path.relative_to(root)}"
+                    ),
+                    file_path=str(file_path.relative_to(root)),
+                )
             )
+
+    if failures:
+        return RuleResultList(failures)
 
     return reporter.rule_passed(rule_name, "No binary files detected.")

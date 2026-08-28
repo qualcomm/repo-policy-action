@@ -89,7 +89,10 @@ def run_all_rules(
             reporter=reporter,
             ignore_matcher=ignore_matcher,
         )
-        results.append(result)
+        if isinstance(result, list):
+            results.extend(result)
+        else:
+            results.append(result)
 
     return results
 

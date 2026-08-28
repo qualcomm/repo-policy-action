@@ -479,6 +479,35 @@ class TestFileContentsRule(unittest.TestCase):
         )
         self.assertFalse(result.passed)
 
+    def test_reports_all_offending_files(self):
+        """Rule reports all files that are missing the required content."""
+        repo = self._make_repo(
+            {
+                "file1.txt": "Hello",
+                "file2.txt": "World",
+                "file3.txt": "License here",
+            }
+        )
+        result = run(
+            repo_path=repo,
+            rule_name="content-check",
+            level="error",
+            options={
+                "globsAll": ["*.txt"],
+                "content": "License",
+            },
+            reporter=self.reporter,
+        )
+        self.assertFalse(result.passed)
+        # result should be a RuleResultList containing 2 failures (file1 and file2)
+        self.assertTrue(isinstance(result, list))
+        self.assertEqual(result.__class__.__name__, "RuleResultList")
+        self.assertEqual(len(result), 2)
+        paths = {r.file_path for r in result}
+        self.assertIn("file1.txt", paths)
+        self.assertIn("file2.txt", paths)
+        self.assertNotIn("file3.txt", paths)
+
 
 if __name__ == "__main__":
     unittest.main()
