@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run repository policy checks
-        uses: qualcomm/repo-policy-action@d5daf4f9b44a503043e447c2e227b45fdeca2167
+        uses: qualcomm/repo-policy-action@72c9c6dc64607153cda24e9f6d3f8e115c1a4a29
         with:
           fail-on-error: 'true'
           fail-on-warning: 'false'
